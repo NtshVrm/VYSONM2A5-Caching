@@ -1,5 +1,5 @@
 {
-  "name": "vysonm2a3",
+  "name": "vysonm2a5",
   "version": "1.0.0",
   "description": "url-shortener-middlewares",
   "scripts": {
@@ -10,14 +10,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/NtshVrm/VYSONM2A3.git"
+    "url": "git+https://github.com/NtshVrm/VYSONM2A5-Caching.git"
   },
   "author": "Nitish Varma",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/NtshVrm/VYSONM2A3/issues"
+    "url": "https://github.com/NtshVrm/VYSONM2A5/issues"
   },
-  "homepage": "https://github.com/NtshVrm/VYSONM2A3#readme",
+  "homepage": "https://github.com/NtshVrm/VYSONM2A5#readme",
   "dependencies": {
     "express": "^4.21.2",
     "fs": "^0.0.1-security",

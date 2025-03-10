@@ -1,4 +1,4 @@
-# VYSONM2A3
+# VYSONM2A5
 
 ## URL Shortener API
 
@@ -31,8 +31,8 @@ The project uses TypeORM for database interactions, allowing for easy management
 1. Clone the repository:
 
 ```sh
-git clone https://github.com/NtshVrm/VYSONM2A3.git
-cd VYSONM2A3
+git clone https://github.com/NtshVrm/VYSONM2A5-Caching.git
+cd VYSONM2A5
 ```
 
 2. Install dependencies:
