@@ -13,6 +13,7 @@ export const responseJson = {
   shortCodeExpired: { statusCode: 410, error: "Short code has expired!" },
   needsPassword: { statusCode: 403, error: "Needs a password to be accessed." },
   incorrectPassword: { statusCode: 403, error: "The password is incorrect." },
+  rateLimitReached: { statusCode: 429, error: "Rate limit reached! Please try after 1min" },
   originalUrlRequired: {
     statusCode: 400,
     error: "Original long URL is required!",
