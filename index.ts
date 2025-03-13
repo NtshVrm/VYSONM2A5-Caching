@@ -123,6 +123,16 @@ app.get("/list", (req: Request, res: Response, next: NextFunction) => {
   })();
 });
 
+app.get("/cache-stats", (req: Request, res: Response, next: NextFunction) => {
+  (async () => {
+    try {
+      return res.json(cache);
+    } catch (err) {
+      next(err);
+    }
+  })();
+});
+
 app.get("/redirect", (req: Request, res: Response, next: NextFunction) => {
   (async () => {
     try {
@@ -133,11 +143,15 @@ app.get("/redirect", (req: Request, res: Response, next: NextFunction) => {
       }
 
       // const memCachedVal = cache[shortcode];
-      // if (memCachedVal) {
-      //   console.log("from cache");
-      //   res.setHeader("Cache-Control", "no-store");
+      // if (memCachedVal?.url) {
+      //   console.log("from cache", memCachedVal);
+      //   cache[shortcode] = {
+      //     url: memCachedVal.url,
+      //     cacheHitCount: memCachedVal.cacheHitCount + 1,
+      //   };
+      //   res.setHeader("Cache-Control", "public, max-age=1111");
       //   res.setHeader("X-Cache", "hit");
-      //   return res.status(302).redirect(memCachedVal);
+      //   return res.status(302).redirect(memCachedVal.url);
       // }
 
       const redisCachedVal = await RedisManager.getValue(shortcode);
@@ -176,7 +190,10 @@ app.get("/redirect", (req: Request, res: Response, next: NextFunction) => {
 
       if (redirectData.original_url) {
         // if (shortcode) {
-        //   cache[shortcode] = redirectData.original_url;
+        //   cache[shortcode] = {
+        //     url: redirectData.original_url,
+        //     cacheHitCount: 0,
+        //   };
         // }
 
         if (shortcode) {
