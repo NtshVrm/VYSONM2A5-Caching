@@ -18,11 +18,63 @@ import {
   loggingMiddleware,
 } from "./middleware";
 import { Users } from "./models/users.model";
+import { cache } from "./memcache";
+import RedisManager from "./services/redis.service";
 
 const app = express();
+app.set("trust proxy", true);
 app.use(express.json());
 
 app.use(responseTime());
+
+const rateLimitMiddleware = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const apiKey = req.headers["api-key"] as string;
+
+  let limit = Infinity;
+  let endpoint = req.path;
+
+  if (req.user && req.user.tier === "free") {
+    const globalRateKey = `${apiKey}:global`;
+    const globalCount = await RedisManager.getValue(globalRateKey);
+
+    if (Number(globalCount) >= 5) {
+      res.status(429).json(responseJson.rateLimitReached);
+    } else {
+      await RedisManager.setValue(
+        globalRateKey,
+        String((globalCount ? Number(globalCount) : 0) + 1),
+        60
+      );
+    }
+  }
+
+  if (endpoint === "/shorten") {
+    limit = 10;
+  } else if (endpoint === "/redirect") {
+    limit = 50;
+  } else {
+    next();
+  }
+
+  const rateKey = `${apiKey}:${endpoint}`;
+
+  const currVal = await RedisManager.getValue(rateKey);
+
+  if (Number(currVal) > limit) {
+    res.status(429).json(responseJson.rateLimitReached);
+  } else {
+    await RedisManager.setValue(
+      rateKey,
+      String((currVal ? Number(currVal) : 0) + 1),
+      1
+    );
+    next();
+  }
+};
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   blacklistMiddleware(req, res, next);
@@ -30,6 +82,10 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
 app.use(async (req: Request, res: Response, next: NextFunction) => {
   await authenticationMiddleware(req, res, next);
+});
+
+app.use(async (req: Request, res: Response, next: NextFunction) => {
+  await rateLimitMiddleware(req, res, next);
 });
 
 app.use(async (req: Request, res: Response, next: NextFunction) => {
@@ -76,6 +132,21 @@ app.get("/redirect", (req: Request, res: Response, next: NextFunction) => {
         return res.status(400).json(responseJson.shortCodeRequired);
       }
 
+      // const memCachedVal = cache[shortcode];
+      // if (memCachedVal) {
+      //   console.log("from cache");
+      //   res.setHeader("Cache-Control", "no-store");
+      //   res.setHeader("X-Cache", "hit");
+      //   return res.status(302).redirect(memCachedVal);
+      // }
+
+      const redisCachedVal = await RedisManager.getValue(shortcode);
+      const parsedVal = JSON.parse(redisCachedVal ?? "{}");
+      if (parsedVal.valid === true) {
+        res.setHeader("X-Cache", "hit");
+        return res.status(302).redirect(parsedVal.url);
+      }
+
       const apiKey = req.headers["api-key"] as string;
 
       let redirectData = await URLShortenerManager.handleRedirect(
@@ -103,9 +174,23 @@ app.get("/redirect", (req: Request, res: Response, next: NextFunction) => {
         return res.status(410).json(responseJson.shortCodeExpired);
       }
 
-      return redirectData.original_url
-        ? res.status(302).redirect(redirectData.original_url)
-        : res.status(404).json(responseJson.shortCodeNotFound);
+      if (redirectData.original_url) {
+        // if (shortcode) {
+        //   cache[shortcode] = redirectData.original_url;
+        // }
+
+        if (shortcode) {
+          await RedisManager.setValue(
+            shortcode,
+            JSON.stringify({ url: redirectData.original_url, valid: true })
+          );
+        }
+
+        res.setHeader("X-Cache", "miss");
+        return res.status(302).redirect(redirectData.original_url);
+      } else {
+        return res.status(404).json(responseJson.shortCodeNotFound);
+      }
     } catch (err) {
       next(err);
     }
@@ -164,6 +249,7 @@ app.post("/shorten", (req: Request, res: Response, next: NextFunction) => {
         },
         apiKey
       );
+
       return res.status(201).json({
         statusCode: 201,
         short_code: newShortCode,
@@ -201,7 +287,7 @@ app.put(
       const row = await URLShortenerManager.findOneRow(shortCode, apiKey);
 
       if (row) {
-        const updatedData = await URLShortenerManager.createShortCode(
+        const shortCode = await URLShortenerManager.createShortCode(
           {
             long_url: row?.original_url,
             custom_code: row?.short_code,
@@ -211,9 +297,14 @@ app.put(
           apiKey
         );
 
-        return res
-          .status(201)
-          .json({ statusCode: 200, short_code: updatedData });
+        if (shortCode && row.short_code) {
+          await RedisManager.setValue(
+            shortCode,
+            JSON.stringify({ url: row.original_url, valid: false })
+          );
+        }
+
+        return res.status(201).json({ statusCode: 200, short_code: shortCode });
       } else {
         return res.status(400).json(responseJson.shortCodeNotFound);
       }
