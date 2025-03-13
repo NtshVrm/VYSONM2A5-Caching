@@ -1,1 +1,1 @@
-export const cache: Record<string, string> = {};
+export const cache: Record<string, { url: string; cacheHitCount: number }> = {};
