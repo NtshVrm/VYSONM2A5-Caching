@@ -4,6 +4,8 @@ import fs from "fs";
 import { responseJson } from "./utils/response.util";
 import UserManager from "./services/users.service";
 import LogManager from "./services/logs.service";
+import redisService from "./services/redis.service";
+import RedisManager from "./services/redis.service";
 
 export const blacklistMiddleware = (
   req: Request,
@@ -91,12 +93,17 @@ export const loggingMiddleware = async (
   res: Response,
   next: NextFunction
 ) => {
+  const ip = Array.isArray(req.headers["x-forwarded-for"])
+    ? req.headers["x-forwarded-for"][0]
+    : typeof req.headers["x-forwarded-for"] === "string"
+      ? req.headers["x-forwarded-for"].split(",")[0].trim()
+      : req.ip || req.ips.join(", ") || req.socket.remoteAddress || "";
   const logObj = {
     timestamp: new Date(),
     method: req.method || "",
     url: req.url || "",
     "user-agent": req.headers["user-agent"] || "",
-    ip: req.ip || req.ips.join() || req.socket.remoteAddress || "",
+    ip: ip,
   };
 
   try {
