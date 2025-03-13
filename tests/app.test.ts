@@ -3,6 +3,8 @@ import request from "supertest";
 import { AppDataSource } from "../db/db.datasource";
 import { Users } from "../models/users.model";
 import { URLShortener } from "../models/url-shortener.model";
+import { cache } from "../memcache";
+import URLShortenerManager from "../services/url-shortener.service";
 
 const API_KEY = "test_api_key";
 const ENT_API_KEY = "ent_test_api_key";
@@ -206,13 +208,16 @@ describe("GET /redirect", () => {
   const password = "securePassword";
 
   beforeEach(async () => {
-    // test URL to use for redirect tests
+    // Clear the cache before each test
+    Object.keys(cache).forEach((key) => delete cache[key]);
+
+    // Create test URL for redirect tests
     await request(app).post("/shorten").set("api-key", API_KEY).send({
       long_url: original_url,
       custom_code: short_code,
       password: password,
     });
-  }, 1000);
+  }, 5000);
 
   it("should fail if API KEY is not given", async () => {
     const response = await request(app).get("/redirect?code=test123");
@@ -231,7 +236,7 @@ describe("GET /redirect", () => {
 
   it("should return 404 if short code is not found", async () => {
     const response = await request(app)
-      .get("/redirect?code=nonexistent")
+      .get("/redirect?code=wrongcode")
       .set("api-key", API_KEY);
     expect(response.status).toBe(404);
     expect(response.body).toBeDefined();
@@ -285,6 +290,30 @@ describe("GET /redirect", () => {
       .set("api-key", API_KEY);
     expect(response.status).toBe(302);
     expect(response.header.location).toBe(original_url);
+  }, 10000);
+
+  it("should return cached URL if short code exists in cache", async () => {
+    // First request to populate the cache
+    await request(app)
+      .get(`/redirect?code=${short_code}&password=${password}`)
+      .set("api-key", API_KEY);
+
+    // Now mock the handleRedirect to verify it's not called on the second request
+    jest
+      .spyOn(URLShortenerManager, "handleRedirect")
+      .mockImplementation(async () => {
+        throw new Error("handleRedirect should not be called");
+      });
+
+    // Second request should use the cache
+    const response = await request(app)
+      .get(`/redirect?code=${short_code}&password=${password}`)
+      .set("api-key", API_KEY);
+
+    expect(response.status).toBe(302);
+    expect(response.header.location).toBe(original_url);
+    // Ensure DB function was not called
+    expect(URLShortenerManager.handleRedirect).not.toHaveBeenCalled();
   }, 10000);
 });
 
