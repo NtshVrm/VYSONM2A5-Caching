@@ -11,6 +11,7 @@ A simple URL shortening service built with Node.js, Express, and TypeORM.
 - View all stored URLs
 - Delete shortened URLs
 - View stored logs
+- handle rate limits based on api key and user tier
 
 ## Prerequisites
 
@@ -58,6 +59,7 @@ Please use one o the below for sampling
 Sample API Keys : 
  - "vyson" - hobby user
  - "vyson_ent" - enterprise user
+ - "free_api_key" - free user
 
 ## API Endpoints
 
